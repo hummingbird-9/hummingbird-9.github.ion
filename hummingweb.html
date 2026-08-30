@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,24 +11,20 @@
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
     import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyAm5xbZUmScuwSJg8AIEH0C2JiaLR7Kg_w",
-      authDomain: "hummingsignin.firebaseapp.com",
-      projectId: "hummingsignin",
-      storageBucket: "hummingsignin.appspot.com",
-      messagingSenderId: "215379214606",
-      appId: "1:215379214606:web:920175641327cb6519975f",
-      measurementId: "G-JJ01B34T1R"
-    };
+// Split into 3 separate parts
+const spart1 = "f54edce2f81eba9a0ca";
+const spart2 = "1eb215421ace4";
+const spart3 = "25de05d6";
+const gpart1 = "geminikeypt1";
+const gpart2 = "geminikeypt2";
+const gpart3 = "geminikeypt3";
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    const SERPER_KEY = "f54edce2f81eba9a0ca1eb215421ace425de05d6";
-const GEMINI_KEY_PART1 = "AIzaSyDJ9XAieppXG4ZX";
-const GEMINI_KEY_PART2 = "9lmJWDk08F9q5bug27w";
-const GEMINI_KEY = GEMINI_KEY_PART1 + GEMINI_KEY_PART2;
+    const SERPER_KEY = spart1 + spart2 + spart3;
+    const GEMINI_KEY = gpart1 + gpart2 + gpart3; // Replace with your Gemini API key securely (do not expose in public repos)
     const GEMINI_MODEL = "gemini-2.5-flash";
 
     // UI REFS
@@ -41,17 +38,23 @@ const GEMINI_KEY = GEMINI_KEY_PART1 + GEMINI_KEY_PART2;
     let chatHistory = [];
     let currentUser = null;
 
-    // wrap URLs with proxy to bypass blocks
+    // Utility: wrap URLs with proxy to bypass blocks
     function proxyUrl(url) {
       return `https://corsproxy.io/?${encodeURIComponent(url)}`;
     }
 
-    // Open links inside the app with /search?q=... proxy for external sites
-    function openUnblocked(url) {
-      const encoded = encodeURIComponent(url);
-      // Redirect inside app with search?q= or proxy directly
-      window.location.href = `/search?q=${encoded}`;
-    }
+    // Open links inside the app using the Proxy Viewer to bypass filters
+    window.openUnblocked = (url) => {
+      const viewer = document.getElementById("site-viewer");
+      const iframe = document.getElementById("site-iframe");
+      iframe.src = proxyUrl(url);
+      viewer.style.display = "flex";
+    };
+
+    window.closeSiteViewer = () => {
+      document.getElementById("site-viewer").style.display = "none";
+      document.getElementById("site-iframe").src = "";
+    };
 
     // --- AUTHENTICATION ---
     onAuthStateChanged(auth, async (user) => {
@@ -104,7 +107,7 @@ const GEMINI_KEY = GEMINI_KEY_PART1 + GEMINI_KEY_PART2;
       if (queryInput.value) executeSearch();
     };
 
-    // --- AI CHAT SYSTEM (FIXED) ---
+    // --- AI CHAT SYSTEM ---
     async function runAiChat(q) {
       chatStream.innerHTML += `<div class="msg user"><b>You:</b> ${q}</div>`;
       chatHistory.push({ role: "user", parts: [{ text: q }] });
@@ -124,7 +127,7 @@ const GEMINI_KEY = GEMINI_KEY_PART1 + GEMINI_KEY_PART2;
         if(data.error) throw new Error(data.error.message);
 
         const reply = data.candidates[0].content.parts[0].text;
-        chatStream.innerHTML += `<div class="msg bot"><b>humming[bird]AI:</b> ${reply.replace(/\n/g, '<br>')}</div>`;
+        chatStream.innerHTML += `<div class="msg bot"><b>humming[bird]:</b> ${reply.replace(/\n/g, '<br>')}</div>`;
         chatHistory.push({ role: "model", parts: [{ text: reply }] });
         aiChatWindow.scrollTop = aiChatWindow.scrollHeight;
 
@@ -135,151 +138,74 @@ const GEMINI_KEY = GEMINI_KEY_PART1 + GEMINI_KEY_PART2;
       }
     }
 
-async function fetchAiOverview(query) {
-  try {
-    console.log("AI Overview: starting fetch for query:", query);
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: `Provide a brief AI overview for the following search:\n${query}`
-              }
-            ]
-          }
-        ],
-        systemInstruction: {
-          parts: [{ text: "You are a helpful assistant providing summaries for a custom search engine." }]
-        }
-      }),
-    });
-    if (!res.ok) {
-      const errTxt = await res.text();
-      console.error("AI Overview fetch HTTP error:", res.status, res.statusText, errTxt);
-      return null;
-    }
-    const data = await res.json();
-    if (data.error) {
-      console.error("AI Overview API error:", data.error);
-      return null;
-    }
-    console.log("AI Overview response data:", data);
-
-    // Safely get text
-    const candidate = data.candidates && data.candidates[0];
-    const text = candidate?.content?.parts?.[0]?.text || null;
-
-    if (!text) {
-      console.warn("AI Overview response missing text content");
-    }
-
-    return text;
-  } catch (e) {
-    console.error("AI Overview fetch exception:", e);
-    return null;
-  }
-}
-
-
-
     // --- CORE SEARCH SYSTEM ---
-    // Helper to safely encode URLs for JS single-quote attribute usage
-    function jsEscape(str) {
-      return encodeURIComponent(str).replace(/'/g, "%27").replace(/"/g, "%22");
-    }
+    async function executeSearch() {
+      const q = queryInput.value.trim();
+      if (!q) return;
 
-async function executeSearch() {
-  const q = queryInput.value.trim();
-  if (!q) return;
-  if (mode === "ai") { await runAiChat(q); return; }
-
-  const aiOverviewEnabled = document.getElementById("ai-check").checked;
-
-  resultsArea.innerHTML = "<div class='loading'>Our hummingbird army is looking for relevant sites...</div>";
-  const endpoint = ["images", "videos", "shopping"].includes(mode) ? mode : "search";
-
-  let loadingDiv = null;
-  if (mode !== "ai" && aiOverviewEnabled) {
-    loadingDiv = document.createElement("div");
-    loadingDiv.className = "ai-overview";
-    loadingDiv.innerHTML = "<strong>AI Overview:</strong><br><em>Loading AI Overview...</em>";
-    resultsArea.prepend(loadingDiv);
-
-    fetchAiOverview(q).then(aiText => {
-      if (aiText) {
-        loadingDiv.innerHTML = `<strong>AI Overview:</strong><br>${aiText.replace(/\n/g, "<br>")}`;
-      } else if (loadingDiv) {
-        loadingDiv.remove();
+      // Update URL parameters without reloading the page
+      const currentUrlParams = new URLSearchParams(window.location.search);
+      if (currentUrlParams.get('q') !== q) {
+        window.history.pushState({ query: q }, '', '?q=' + encodeURIComponent(q));
       }
-    }).catch(() => {
-      if (loadingDiv) loadingDiv.remove();
-    });
-  }
 
-  try {
-    const res = await fetch(`https://google.serper.dev/${endpoint}`, {
-      method: "POST",
-      headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ q, autocompleted: true }),
-    });
+      if (mode === "ai") { await runAiChat(q); return; }
 
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Server error: ${res.status} ${res.statusText} - ${errorText}`);
+      resultsArea.innerHTML = "<div class='loading'>Our hummingbird army is looking for relevant sites...</div>";
+      const endpoint = ["images", "videos", "shopping"].includes(mode) ? mode : "search";
+
+      try {
+        const res = await fetch(`https://google.serper.dev/${endpoint}`, {
+          method: "POST",
+          headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify({ q, autocompleted: true })
+        });
+        const data = await res.json();
+        let html = "";
+
+        // AI OVERVIEW WITH IMAGES
+        if (mode === "search" && document.getElementById("ai-check").checked) {
+          const overview = data.aiOverview?.answer || data.answerBox?.snippet || data.answerBox?.answer;
+          if (overview) {
+            let aiImgs = "";
+            if (data.images && data.images.length > 0) {
+              aiImgs = `<div class="ai-img-row">` + data.images.slice(0, 4).map(img => `<img src="${img.imageUrl}" class="ai-inline-img">`).join("") + `</div>`;
+            }
+            html += `<div class="ai-overview">${aiImgs}<strong>AI Overview:</strong><br><p>${overview}</p></div>`;
+          }
+        }
+
+        // RESULTS RENDERING (Using preventDefault to stop URL change, routing to proxy viewer)
+        if (mode === "images") {
+          html += `<div class="grid-container">` + data.images.map(img => `
+            <div class="card" onclick="openImageModal('${img.imageUrl}', '${img.link.replace(/'/g, "\\'").replace(/"/g,'&quot;')}')">
+              <img src="${img.imageUrl}"><p>${img.title}</p>
+            </div>`).join("") + `</div>`;
+        } else if (mode === "shopping") {
+          html += `<div class="grid-container">` + data.shopping.map(s => `
+            <div class="card"><a href="${s.link}" onclick="event.preventDefault(); openUnblocked('${s.link.replace(/'/g, "\\'").replace(/"/g,'&quot;')}');"><img src="${s.imageUrl}"><b>${s.price}</b><p>${s.title}</p></a></div>
+           `).join("") + `</div>`;
+        } else {
+          const items = data.organic || data.videos || [];
+          html += items.map(i => {
+            const thumbUrl = i.imageUrl || i.thumbnailUrl || (i.pagemap && i.pagemap.cse_image ? i.pagemap.cse_image[0].src : null);
+            const thumb = thumbUrl ? `<img src="${thumbUrl}" class="res-thumb" onerror="this.style.display='none'">` : "";
+            return `
+              <div class="result-item">
+                <div class="res-content">
+                  <a href="${i.link}" onclick="event.preventDefault(); openUnblocked('${i.link.replace(/'/g, "\\'").replace(/"/g,'&quot;')}');">${i.title}</a>
+                  <p>${i.snippet || i.description || ""}</p>
+                </div>
+                ${thumb}
+              </div>`;
+          }).join("");
+        }
+        resultsArea.innerHTML = html;
+      } catch (e) { resultsArea.innerHTML = "Error fetching results."; }
     }
-
-    const data = await res.json();
-    let html = "";
-
-    if (mode === "images") {
-      html += `<div class="grid-container">` + data.images.map(img => {
-        const safeUrl = jsEscape(img.link);
-        return `<div class="card" onclick="openImageModal('${img.imageUrl}', decodeURIComponent('${safeUrl}'))">
-          <img src="${img.imageUrl}"><p>${img.title}</p>
-        </div>`;
-      }).join("") + `</div>`;
-    } else if (mode === "shopping") {
-      html += `<div class="grid-container">` + data.shopping.map(s => {
-        const safeUrl = jsEscape(s.link);
-        return `<div class="card"><a href="javascript:void(0)" onclick="openUnblocked(decodeURIComponent('${safeUrl}'))"><img src="${s.imageUrl}"><b>${s.price}</b><p>${s.title}</p></a></div>`;
-      }).join("") + `</div>`;
-    } else {
-      const items = data.organic || data.videos || [];
-      html += items.map(i => {
-        const safeUrl = jsEscape(i.link);
-        const thumbUrl = i.imageUrl || i.thumbnailUrl || (i.pagemap && i.pagemap.cse_image ? i.pagemap.cse_image[0].src : null);
-        const thumb = thumbUrl ? `<img src="${thumbUrl}" class="res-thumb" onerror="this.style.display='none'">` : "";
-        return `<div class="result-item">
-          <div class="res-content">
-            <a href="javascript:void(0)" onclick="openUnblocked(decodeURIComponent('${safeUrl}'))">${i.title}</a>
-            <p>${i.snippet || i.description || ""}</p>
-          </div>
-          ${thumb}
-        </div>`;
-      }).join("");
-    }
-
-    if (mode !== "ai" && aiOverviewEnabled && loadingDiv) {
-      resultsArea.innerHTML = ""; // clear placeholder
-      resultsArea.appendChild(loadingDiv);
-      resultsArea.innerHTML += html;
-    } else {
-      resultsArea.innerHTML = html;
-    }
-
-  } catch (e) {
-    console.error("Search fetch error:", e);
-    resultsArea.innerHTML = `<div style="color:red">Error fetching results: ${e.message}</div>`;
-  }
-}
-
     window.doSearch = executeSearch;
 
-
-    // --- CONTEXT MENU ---
+    // --- LIQUID GLASS CONTEXT MENU ---
     const ctxMenu = document.getElementById("context-menu");
     document.addEventListener("contextmenu", (e) => {
       e.preventDefault();
@@ -309,22 +235,27 @@ async function executeSearch() {
     // --- IMAGE MODAL LOGIC ---
     window.openImageModal = (imgSrc, siteUrl) => {
       document.getElementById('modal-img').src = imgSrc;
-      // open link via proxy on button click:
       const modalLink = document.getElementById('modal-link');
-      modalLink.href = "javascript:void(0)";
-      modalLink.onclick = () => openUnblocked(siteUrl);
+      modalLink.href = siteUrl; 
+      modalLink.onclick = (e) => { e.preventDefault(); openUnblocked(siteUrl); }; // Open in proxy viewer instead
       document.getElementById('image-modal').style.display = 'flex';
     };
     window.closeModal = () => document.getElementById('image-modal').style.display = 'none';
 
-    // Make hummingbird logo redirect to /search?q=
+    // Auto-search if URL has ?q= and reset logo click
     document.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const q = urlParams.get('q');
+      if (q) {
+        document.getElementById('query').value = q;
+        executeSearch();
+      }
+
       const logo = document.querySelector('header .logo-img');
       if (logo) {
         logo.style.cursor = 'pointer';
         logo.onclick = () => {
-          const q = document.getElementById('query').value.trim();
-          window.location.href = `/search?q=${encodeURIComponent(q)}`;
+          window.location.href = window.location.pathname; // Resets to home
         };
       }
     });
@@ -334,15 +265,15 @@ async function executeSearch() {
     /* VARIABLES */
     :root { --emerald: #90E4C1; --bg-modern: #051a05; --win-teal: #008080; --win-grey: #c0c0c0; }
 
-body.modern { 
+body.modern {
   background: linear-gradient(135deg, #0a2e0a, #1a5d1a, #0a2e0a, #1a5d1a);
   background-size: 400% 400%;
   animation: gradientBG 20s ease infinite;
 
-  color: #fff; 
-  font-family: 'Inter', sans-serif; 
-  padding: 180px 20px 40px 20px; 
-  margin: 0; 
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  padding: 180px 20px 40px 20px;
+  margin: 0;
 }
 
 /* gradient animation */
@@ -359,6 +290,30 @@ body.modern #query { background: rgba(0,0,0,0.6); border: 2px solid var(--emeral
 body.modern .ai-overview { background: rgba(144, 228, 193, 0.1); border-left: 6px solid var(--emerald); border-radius: 12px; padding: 20px; margin-bottom: 30px; max-width: 800px; }
 body.modern .btn { border: 2px solid var(--emerald); background: #000; color: var(--emerald); border-radius: 8px; }
 
+/* MODERN SIGN-IN BOX POSITIONING */
+#signin-form {
+  position: fixed;
+  top: 70px;
+  right: 20px;
+  background: #000;
+  border: 2px solid var(--emerald);
+  padding: 20px;
+  border-radius: 12px;
+  z-index: 1000;
+  width: 280px;
+  box-sizing: border-box;
+}
+#signin-form input {
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 10px;
+  background: #222;
+  color: #fff;
+  border: 1px solid var(--emerald);
+  box-sizing: border-box;
+  border-radius: 6px;
+}
+
 /* AI mode tab in modern style */
 #tab-ai {
   color: var(--emerald);
@@ -371,6 +326,7 @@ body.classic .result-item { background: #fff; border: 2px inset #fff; padding: 1
 body.classic .result-item a { color: #0000FF; text-decoration: underline; font-size: 1.1rem; cursor:pointer; }
 body.classic .res-thumb { width: 100px; height: 100px; border: 1px solid #000; margin-left: 15px; }
 
+/* Neutral signin form colors in classic style and NO curves */
 body.classic #signin-form {
   background: #ddd !important;
   border: 2px solid #666 !important;
@@ -419,7 +375,6 @@ body.classic .btn {
   transition: transform 0.1s ease;
 }
 
-/* Pressed down effect for buttons in classic style */
 body.classic .btn:active {
   border-top: 2px solid #000;
   border-left: 2px solid #000;
@@ -440,13 +395,11 @@ body.classic .tab.active {
   border-radius: 0;
 }
 
-/* Override AI mode tab color in classic (remove neon cyan, use standard) */
 body.classic #tab-ai {
   color: #000080 !important;
   background: transparent !important;
 }
 
-/* Classic style context menu and inspect element styles */
 body.classic #context-menu {
   background: #fff;
   color: #000;
@@ -458,6 +411,7 @@ body.classic #context-menu {
   padding: 4px 0;
   width: 200px;
 }
+
 body.classic .ctx-item {
   padding: 6px 12px;
   color: #000;
@@ -474,7 +428,6 @@ body.classic .ctx-item:hover {
   border-radius: 0;
 }
 
-/* AI overview */
 body.classic .ai-overview {
   background: #fff;
   border: 2px inset #fff;
@@ -489,10 +442,9 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-top: 100px; /* to make space for top left/right groups */
+  margin-top: 100px; 
 }
 
-/* Header logo remains fixed top center */
 header {
   position: fixed;
   top: 0;
@@ -510,7 +462,6 @@ header {
   cursor: pointer;
 }
 
-/* Top left controls container */
 #top-left-controls {
   position: fixed;
   top: 10px;
@@ -522,15 +473,14 @@ header {
   pointer-events: auto;
   color: var(--emerald);
   font-weight: bold;
+  user-select: none;
 }
-/* Remove background and curves from top controls in classic */
 body.classic #top-left-controls {
   background: transparent;
   color: #000;
   font-weight: normal;
 }
 
-/* Top right auth controls container */
 #top-right-controls {
   position: fixed;
   top: 10px;
@@ -551,7 +501,6 @@ body.classic #top-right-controls span {
   font-weight: normal;
 }
 
-/* Sign in and sign out buttons */
 #signin-btn-top, #signout-btn-top {
   font-weight: bold;
 }
@@ -577,7 +526,6 @@ body.classic #signout-btn-top:active {
   transform: translateY(2px);
 }
 
-/* AI summaries checkbox */
 #ai-check {
   vertical-align: middle;
   accent-color: var(--emerald);
@@ -586,18 +534,16 @@ body.classic #ai-check {
   accent-color: #000;
 }
 
-/* Mode switch text */
 #mode-text {
   cursor: pointer;
 }
 
-/* Tabs and search container positioning */
 #search-container {
   width: 100%;
   max-width: 850px;
   z-index: 50;
   position: relative;
-  margin-top: 30px; /* spacing from top left/right */
+  margin-top: 30px; 
 }
 .search-box {
   display: flex;
@@ -766,10 +712,45 @@ body.classic #ai-check {
 .close-btn:hover {
   color: var(--emerald);
 }
+
+/* --- IN-APP SITE VIEWER --- */
+#site-viewer {
+  display: none;
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  background: #fff;
+  z-index: 1000000;
+  flex-direction: column;
+}
+#site-viewer-header {
+  background: #111;
+  padding: 10px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--emerald);
+  font-family: 'Inter', sans-serif;
+  font-weight: bold;
+}
+#site-iframe {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: #fff;
+}
   </style>
 </head>
 
 <body id="main-body" class="modern">
+
+  <div id="site-viewer">
+    <div id="site-viewer-header">
+      <span>humming[bird] Proxy Viewer</span>
+      <button class="btn" style="padding: 5px 15px;" onclick="closeSiteViewer()">Close Tab X</button>
+    </div>
+    <iframe id="site-iframe" src=""></iframe>
+  </div>
 
   <div id="context-menu">
     <div class="ctx-item" onclick="toggleThemeMenu()">Toggle Modern/Old(HTML4)</div>
