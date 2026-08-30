@@ -9,7 +9,7 @@
   <style>
     /* --- Your Original Styles --- */
     body {
-      margin: 0;
+      margin: 0;http://ghp.humming.rf.gd/hummingweb/
       padding: 20px;
       min-height: 100vh;
       display: flex;
@@ -43,7 +43,7 @@
       margin: 10px 0; /* Keeps buttons tight together */
       padding: 14px 40px;
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 8px 32px 0 rgba(0, 255, 45, 0.15);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 8px 32px 0 rghttp://ghp.humming.rf.gd/hummingweb/ba(0, 255, 45, 0.15);
       backdrop-filter: saturate(180%) blur(10px);
       -webkit-backdrop-filter: saturate(180%) blur(10px);
       transition: transform 0.3s ease, background 0.3s ease;
@@ -72,7 +72,7 @@
 
     #gallery-btn:hover ~ #warning-text {
       opacity: 1;
-    }
+    }http://ghp.humming.rf.gd/hummingweb/
   </style>
 </head>
 
@@ -98,7 +98,8 @@
     function checkClassStatus() {
 //pings onecompiler for science class detection
       fetch('https://onecompiler.com', { mode: 'no-cors' })
-        .then(() => {
+        .then(() => {http://ghp.humming.rf.gd/hummingweb/
+
           // If reachable, show the button
           document.getElementById('gallery-btn').style.display = 'inline-block';
           // Ensure warning text can reappear if class ends
@@ -107,7 +108,7 @@
         .catch(() => {
           // If blocked (Science class active), hide everything risky
           document.getElementById('gallery-btn').style.display = 'none';
-          document.getElementById('warning-text').style.opacity = '0';
+          document.getElementById('warning-text').style.opacity = '0';http://ghp.humming.rf.gd/hummingweb/
           document.getElementById('warning-text').style.visibility = 'hidden';
           console.log("Science Class Active: Gallery Hidden.");
         });
@@ -121,12 +122,11 @@
 
     // EMERGENCY MANUAL HIDE: Press 'Escape' to hide the gallery instantly
     document.addEventListener('keydown', (e) => {
-      if (e.key === "Escape") {
+      if (e.key === "Escape") {http://ghp.humming.rf.gd/hummingweb/
         document.getElementById('gallery-btn').style.display = 'none';
         document.getElementById('warning-text').style.display = 'none';
       }
     });
   </script>
 </body>
-
 </html>
